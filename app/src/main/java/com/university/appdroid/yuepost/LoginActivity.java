@@ -17,6 +17,11 @@ import android.widget.EditText;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import org.jsoup.Jsoup;
+import org.jsoup.nodes.Document;
+import org.jsoup.nodes.Element;
+import org.jsoup.select.Elements;
+
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -26,6 +31,8 @@ import java.net.CookieManager;
 import java.net.CookiePolicy;
 import java.net.PasswordAuthentication;
 import java.net.URL;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 import javax.net.ssl.HostnameVerifier;
@@ -35,7 +42,7 @@ import javax.net.ssl.SSLSession;
 public class LoginActivity extends AppCompatActivity implements View.OnClickListener, TextView.OnEditorActionListener {
 
 	private TextView result;
-	final String epostLinkString = "https://www.cse.yorku.ca/~roumani/ePost/server/ep.cgi/?year=2015-16&term=W&course=4315";
+	final String epostLinkString = "https://www.cse.yorku.ca/~roumani/ePost/server/ep.cgi/";
 	private EditText username;
 	private EditText password;
 	private Button loginButton;
@@ -67,6 +74,10 @@ public class LoginActivity extends AppCompatActivity implements View.OnClickList
 		loginButton.setOnClickListener(this);
 		password.setOnEditorActionListener(this);
 		password.setImeOptions(EditorInfo.IME_ACTION_DONE);
+
+		// variables
+		String[] termsArray = {"F", "W", "S"};
+		terms = new ArrayList<String>(Arrays.asList(termsArray));
 	}
 
 	@Override
@@ -135,12 +146,7 @@ public class LoginActivity extends AppCompatActivity implements View.OnClickList
 			System.out.println("Authenticating");
 			Authenticator.setDefault(new Authenticator() {
 				protected PasswordAuthentication getPasswordAuthentication() {
-					try {
-						return new PasswordAuthentication(username.getText().toString(), password.getText().toString().toCharArray());
-					} finally {
-						// to handle bad credentials
-						return null;
-					}
+					return new PasswordAuthentication(username.getText().toString(), password.getText().toString().toCharArray());
 				}
 			});
 
@@ -148,6 +154,7 @@ public class LoginActivity extends AppCompatActivity implements View.OnClickList
 				URL epostLink = new URL(urls[0]);
 				System.out.println("Opening connection");
 				urlConnection = (HttpsURLConnection) epostLink.openConnection();
+//				urlConnection.setUseCaches(false);
 				urlConnection.setConnectTimeout(5000);
 				urlConnection.setReadTimeout(5000);
 				urlConnection.setHostnameVerifier(hostnameVerifier);
@@ -157,6 +164,8 @@ public class LoginActivity extends AppCompatActivity implements View.OnClickList
 				if (urlConnection.getResponseCode() == 200) {
 					System.out.println("Extracting HTML");
 					result = readPage(urlConnection);
+					extractYears(result);
+
 				} else if (urlConnection.getResponseCode() == 401) {
 					result = "401";
 				}
@@ -190,5 +199,22 @@ public class LoginActivity extends AppCompatActivity implements View.OnClickList
 		}
 		in.close();
 		return content.toString();
+	}
+
+	private void extractYears(String data) {
+		// reading years
+		Document doc = Jsoup.parse(data);
+		Elements yearTag = doc.getElementsByTag("select");
+		years = new ArrayList<String>();
+		for (Element element : yearTag) {
+			String name = element.attr("name");
+			if (name.equals("year")) {
+				System.out.println("Found select tag with year");
+				Elements optionTag = element.select("option");
+				for (Element innerElement : optionTag) {
+					years.add(innerElement.text());
+				}
+			}
+		}
 	}
 }
