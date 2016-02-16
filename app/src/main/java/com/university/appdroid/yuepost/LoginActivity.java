@@ -51,6 +51,7 @@ public class LoginActivity extends AppCompatActivity implements View.OnClickList
 	private List<String> years;
 	private List<String> courses;
 	private Drawable error;
+	private boolean triedCredentials;
 
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
@@ -135,6 +136,7 @@ public class LoginActivity extends AppCompatActivity implements View.OnClickList
 
 			String result = "";
 			HttpsURLConnection urlConnection = null;
+			triedCredentials = false;
 
 			// cookie manager
 			System.out.println("Setting Cookie Manager");
@@ -146,7 +148,12 @@ public class LoginActivity extends AppCompatActivity implements View.OnClickList
 			System.out.println("Authenticating");
 			Authenticator.setDefault(new Authenticator() {
 				protected PasswordAuthentication getPasswordAuthentication() {
-					return new PasswordAuthentication(username.getText().toString(), password.getText().toString().toCharArray());
+					if (!triedCredentials) {
+						triedCredentials = true;
+						return new PasswordAuthentication(username.getText().toString(), password.getText().toString().toCharArray());
+					} else {
+						return null;
+					}
 				}
 			});
 
@@ -161,11 +168,12 @@ public class LoginActivity extends AppCompatActivity implements View.OnClickList
 
 				urlConnection.getResponseCode();
 				System.out.println("Response Code: " + urlConnection.getResponseCode());
+				// upon successful connection
 				if (urlConnection.getResponseCode() == 200) {
 					System.out.println("Extracting HTML");
 					result = readPage(urlConnection);
 					extractYears(result);
-
+				// bad credentials
 				} else if (urlConnection.getResponseCode() == 401) {
 					result = "401";
 				}
