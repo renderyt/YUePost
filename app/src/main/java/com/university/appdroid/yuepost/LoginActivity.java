@@ -50,6 +50,7 @@ public class LoginActivity extends AppCompatActivity implements View.OnClickList
 	private List<String> terms;
 	private List<String> years;
 	private List<String> courses;
+	private List<String> enrolled;
 	private Drawable error;
 	private boolean triedCredentials;
 
@@ -96,7 +97,7 @@ public class LoginActivity extends AppCompatActivity implements View.OnClickList
 					new LoginTask().execute(epostLinkString);
 				} else {
 					// Not connected to network
-					// TO DO - MOVE VARIABLES FOR CONVENIENCE //
+					// CHANGE TO ALERT DIALOG
 					Toast toast = Toast.makeText(context, "No network connection available", toastDuration);
 					toast.show();
 				}
@@ -168,13 +169,23 @@ public class LoginActivity extends AppCompatActivity implements View.OnClickList
 
 				urlConnection.getResponseCode();
 				System.out.println("Response Code: " + urlConnection.getResponseCode());
-				// upon successful connection
 				if (urlConnection.getResponseCode() == 200) {
-					System.out.println("Extracting HTML");
-					result = readPage(urlConnection);
-					extractYears(result);
-				// bad credentials
+					// upon successful connection
+					// SHOULD OPEN A NEW ACTIVITY AND DO DATA READING THERE
+					result = getPage(urlConnection);
+					getYears(result);
+					for (String year : years) {
+						for (String term : terms) {
+							// get courses
+							// for every course, get grades
+							// if not enrolled skip
+							// else get data and save it to enrolled
+						}
+					}
 				} else if (urlConnection.getResponseCode() == 401) {
+					// bad credentials
+					Toast toast = Toast.makeText(getApplicationContext(), "Username and password do not match.", toastDuration);
+					toast.show();
 					result = "401";
 				}
 			} catch (Exception e) {
@@ -196,12 +207,12 @@ public class LoginActivity extends AppCompatActivity implements View.OnClickList
 		}
 	}
 
-	private String readPage(HttpsURLConnection urlConnection) throws IOException {
+	private String getPage(HttpsURLConnection urlConnection) throws IOException {
+		System.out.println("Reading Page");
 		BufferedReader in = new BufferedReader(new InputStreamReader(
 				urlConnection.getInputStream()));
 		String inputLine;
 		StringBuffer content = new StringBuffer();
-
 		while ((inputLine = in.readLine()) != null) {
 			content.append(inputLine);
 		}
@@ -209,20 +220,42 @@ public class LoginActivity extends AppCompatActivity implements View.OnClickList
 		return content.toString();
 	}
 
-	private void extractYears(String data) {
-		// reading years
+	private void getYears(String data) {
+		System.out.println("Extracting Years");
+		years = new ArrayList<String>();
 		Document doc = Jsoup.parse(data);
 		Elements yearTag = doc.getElementsByTag("select");
-		years = new ArrayList<String>();
 		for (Element element : yearTag) {
 			String name = element.attr("name");
 			if (name.equals("year")) {
-				System.out.println("Found select tag with year");
 				Elements optionTag = element.select("option");
 				for (Element innerElement : optionTag) {
 					years.add(innerElement.text());
 				}
 			}
 		}
+	}
+
+	private void getCourses(String data) {
+		System.out.println("Extracting Years");
+		courses = new ArrayList<String>();
+		Document doc = Jsoup.parse(data);
+		Element courseElement = doc.getElementById("course");
+		Elements optionTag = courseElement.select("option");
+		for (Element innerElement : optionTag) {
+			years.add(innerElement.text());
+		}
+	}
+
+	private void buildURLRequest(String year, String term) {
+		System.out.println("Building URL");
+
+	}
+
+	private String getEnrollment(URL url) {
+		System.out.println("Building URL");
+		String courseDetails = "";
+		enrolled = new ArrayList<String>();
+		return courseDetails;
 	}
 }
