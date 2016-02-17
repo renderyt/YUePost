@@ -33,7 +33,12 @@ import java.net.PasswordAuthentication;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Calendar;
+import java.util.GregorianCalendar;
+import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 
 import javax.net.ssl.HostnameVerifier;
 import javax.net.ssl.HttpsURLConnection;
@@ -42,17 +47,21 @@ import javax.net.ssl.SSLSession;
 public class LoginActivity extends AppCompatActivity implements View.OnClickListener, TextView.OnEditorActionListener {
 
 	private TextView result;
-	final String epostLinkString = "https://www.cse.yorku.ca/~roumani/ePost/server/ep.cgi/";
+	final String epostLinkBase = "https://www.cse.yorku.ca/~roumani/ePost/server/ep.cgi/";
+	private String epostLink;
 	private EditText username;
 	private EditText password;
 	private Button loginButton;
 	private int toastDuration = Toast.LENGTH_SHORT;
-	private List<String> terms;
-	private List<String> years;
+	//	private List<String> years;
+	private String year;
+	private String term;
+	private HashMap<String, List<Integer>> terms;
 	private List<String> courses;
 	private List<String> enrolled;
 	private Drawable error;
 	private boolean triedCredentials;
+	private Calendar calendar;
 
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
@@ -78,8 +87,22 @@ public class LoginActivity extends AppCompatActivity implements View.OnClickList
 		password.setImeOptions(EditorInfo.IME_ACTION_DONE);
 
 		// variables
-		String[] termsArray = {"F", "W", "S"};
-		terms = new ArrayList<String>(Arrays.asList(termsArray));
+		final Integer[] fallArray = {8, 9, 10, 11};
+		final Integer[] winterArray = {0, 1, 2, 3};
+		final Integer[] summerArray = {4, 5, 6, 7};
+		final List<Integer> fallList = new ArrayList<Integer>(Arrays.asList(fallArray));
+		final List<Integer> winterList = new ArrayList<Integer>(Arrays.asList(winterArray));
+		final List<Integer> summerList = new ArrayList<Integer>(Arrays.asList(summerArray));
+		terms = new HashMap<String, List<Integer>>();
+		terms.put("F", fallList);
+		terms.put("W", winterList);
+		terms.put("S", summerList);
+		Calendar calendar = new GregorianCalendar();
+		int currentMonth = calendar.get(Calendar.MONTH);
+		int currentYear = calendar.get(Calendar.YEAR);
+		term = getSemester(currentMonth);
+		year = getYear(term, currentYear);
+		buildRequest();
 	}
 
 	@Override
@@ -94,7 +117,8 @@ public class LoginActivity extends AppCompatActivity implements View.OnClickList
 				if (networkInfo != null && networkInfo.isConnected()) {
 					// login to ePost
 					System.out.println("Begin Login Task");
-					new LoginTask().execute(epostLinkString);
+					System.out.println(epostLink);
+					new LoginTask().execute(epostLink);
 				} else {
 					// Not connected to network
 					// CHANGE TO ALERT DIALOG
@@ -173,15 +197,10 @@ public class LoginActivity extends AppCompatActivity implements View.OnClickList
 					// upon successful connection
 					// SHOULD OPEN A NEW ACTIVITY AND DO DATA READING THERE
 					result = getPage(urlConnection);
-					getYears(result);
-					for (String year : years) {
-						for (String term : terms) {
-							// get courses
-							// for every course, get grades
-							// if not enrolled skip
-							// else get data and save it to enrolled
-						}
-					}
+					getCourses(result);
+//					getEnrolledCourses(urlConnection);
+
+					//	Intent intent = new Intent(this, MainActivity.class);
 				} else if (urlConnection.getResponseCode() == 401) {
 					// bad credentials
 					Toast toast = Toast.makeText(getApplicationContext(), "Username and password do not match.", toastDuration);
@@ -197,7 +216,7 @@ public class LoginActivity extends AppCompatActivity implements View.OnClickList
 					urlConnection.disconnect();
 				}
 			}
-			return result;
+			return courses.toString();
 		}
 
 		// onPostExecute displays the results of the AsyncTask.
@@ -220,42 +239,77 @@ public class LoginActivity extends AppCompatActivity implements View.OnClickList
 		return content.toString();
 	}
 
-	private void getYears(String data) {
-		System.out.println("Extracting Years");
-		years = new ArrayList<String>();
-		Document doc = Jsoup.parse(data);
-		Elements yearTag = doc.getElementsByTag("select");
-		for (Element element : yearTag) {
-			String name = element.attr("name");
-			if (name.equals("year")) {
-				Elements optionTag = element.select("option");
-				for (Element innerElement : optionTag) {
-					years.add(innerElement.text());
+	private String getSemester(int month) {
+		// get current month and year
+		System.out.println("Getting Semester");
+		String semester = "";
+		Iterator it = terms.entrySet().iterator();
+		while (it.hasNext()) {
+			Map.Entry pair = (Map.Entry) it.next();
+			List list = (List) pair.getValue();
+			for (Object m : list) {
+				if (m == month) {
+					semester = (String) pair.getKey();
 				}
 			}
 		}
+		return semester;
+	}
+
+	private String getYear(String semester, int year) {
+		System.out.println("Getting year");
+		String semesterYear = "";
+		if (semester == "F") {
+			int tempInteger = year;
+			tempInteger++;
+			String tempString = String.valueOf(tempInteger);
+			tempString = tempString.substring(tempString.length() - 2, tempString.length());
+			semesterYear = String.valueOf(year + "-" + tempString);
+		} else if (semester == "W" || semester == "S") {
+			int tempInteger = year;
+			year--;
+			String tempString = String.valueOf(tempInteger);
+			tempString = tempString.substring(tempString.length() - 2, tempString.length());
+			semesterYear = String.valueOf(year + "-" + tempString);
+		}
+		return semesterYear;
+	}
+
+	private void buildRequest() {
+		System.out.println("Building initial request");
+		epostLink = epostLinkBase + "?year=" + year + "&term=" + term;
+	}
+
+	private void buildRequest(String course) {
+		System.out.println("Building course request");
+		epostLink = epostLinkBase + "?year=" + year + "&term=" + term + "&course=" + course;
 	}
 
 	private void getCourses(String data) {
-		System.out.println("Extracting Years");
+		System.out.println("Getting courses");
 		courses = new ArrayList<String>();
 		Document doc = Jsoup.parse(data);
 		Element courseElement = doc.getElementById("course");
 		Elements optionTag = courseElement.select("option");
 		for (Element innerElement : optionTag) {
-			years.add(innerElement.text());
+			// test if it is an actual course code
+			if (innerElement.text().length() > 1) {
+				courses.add(innerElement.text());
+			}
 		}
 	}
 
-	private void buildURLRequest(String year, String term) {
-		System.out.println("Building URL");
-
-	}
-
-	private String getEnrollment(URL url) {
-		System.out.println("Building URL");
-		String courseDetails = "";
+	private void getEnrolledCourses(HttpsURLConnection urlConnection) throws IOException {
+		System.out.println("Getting enrolled courses");
 		enrolled = new ArrayList<String>();
-		return courseDetails;
+		for (String course : courses) {
+			buildRequest(course);
+			URL url = new URL(epostLink);
+			urlConnection = (HttpsURLConnection) url.openConnection();
+			String content = getPage(urlConnection);
+
+			Document doc = Jsoup.parse(content);
+			Elements tableElements = doc.getElementsByTag("table");
+		}
 	}
 }
