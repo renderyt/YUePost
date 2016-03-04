@@ -27,9 +27,11 @@ import java.util.Arrays;
 import java.util.Calendar;
 import java.util.GregorianCalendar;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import javax.net.ssl.HttpsURLConnection;
 
@@ -41,14 +43,12 @@ public class MainActivity extends AppCompatActivity {
 	private String year;
 	private String term;
 	private HashMap<String, List<Integer>> terms;
-	private List<String> courses;
+	private Set<String> courses;
 	private Calendar calendar;
 	final String epostLinkBase = "https://www.cse.yorku.ca/~roumani/ePost/server/ep.cgi/";
 	private String epostLink;
 	private boolean rememberMe;
-	private RecyclerView recyclerView;
-	private RecyclerView.Adapter adapter;
-	private RecyclerView.LayoutManager mLayoutManager;
+	private RecyclerViewAdapter adapter;
 	private List<Course> enrolled;
 	private boolean triedCredentials;
 
@@ -60,12 +60,14 @@ public class MainActivity extends AppCompatActivity {
 		setSupportActionBar(toolbar);
 
 		// recycler view
-		recyclerView = (RecyclerView) findViewById(R.id.recycler_view);
-		mLayoutManager = new LinearLayoutManager(this);
-		recyclerView.setLayoutManager(mLayoutManager);
+		RecyclerView recyclerView = (RecyclerView) findViewById(R.id.recycler_view);
+		LinearLayoutManager linearLayoutManager = new LinearLayoutManager(getApplicationContext());
+		recyclerView.setLayoutManager(linearLayoutManager);
 		enrolled = new ArrayList<>();
-		adapter = new RecyclerAdapter(enrolled);
+		adapter = new RecyclerViewAdapter(enrolled);
 		recyclerView.setAdapter(adapter);
+		List<String> list = new ArrayList<String>();
+		list.add("hello");
 
 		initializeState();
 
@@ -97,7 +99,7 @@ public class MainActivity extends AppCompatActivity {
 		SavedSharedPreferences.clearUser(getApplicationContext());
 	}
 
-	// asynchronous download of source code
+	// asynchronous download of code
 	private class ExtractTask extends AsyncTask<String, Void, Integer> {
 		@Override
 		protected Integer doInBackground(String... urls) {
@@ -130,18 +132,22 @@ public class MainActivity extends AppCompatActivity {
 				MyHostnameVerifier hv = new MyHostnameVerifier();
 				urlConnection.setHostnameVerifier(hv);
 				responseCode = urlConnection.getResponseCode();
-				System.out.println("Response Code: " + urlConnection.getResponseCode());
 
 				content = getPage(urlConnection);
-				getCourses(content);
+				if (SavedSharedPreferences.getPrefCourses(getApplicationContext()).isEmpty()) {
+					getCourses(content);
+				} else {
+					courses = SavedSharedPreferences.getPrefCourses(getApplicationContext());
+				}
 				getEnrolledCourses();
+
 
 			} catch (Exception e) {
 				// Add error logging
 				System.out.println(e);
 			} finally {
 				if (urlConnection != null) {
-					System.out.println("Closing Connection");
+//					System.out.println("Closing Connection");
 					urlConnection.disconnect();
 				}
 			}
@@ -152,7 +158,11 @@ public class MainActivity extends AppCompatActivity {
 		@Override
 		protected void onPostExecute(Integer response) {
 			if (response == 200) {
+				System.out.println("Enrolled in " + enrolled.size() + " courses");
+				adapter.notifyDataSetChanged();
 				// upon successful connection, populate the listview
+			} else if (response == 401) {
+				System.out.println("We Failed");
 			}
 		}
 	}
@@ -218,12 +228,12 @@ public class MainActivity extends AppCompatActivity {
 
 	private void getCourses(String data) {
 //		System.out.println("Getting courses");
-		courses = new ArrayList<String>();
+		courses = new HashSet<String>();
 		Document doc = Jsoup.parse(data);
 		Element courseElement = doc.getElementById("course");
 		Elements optionTag = courseElement.select("option");
 		for (Element innerElement : optionTag) {
-			// test if it is an actual course code
+			// test if it is an actual course
 			if (innerElement.text().length() > 1) {
 				courses.add(innerElement.text());
 			}

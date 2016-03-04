@@ -111,7 +111,7 @@ public class LoginActivity extends AppCompatActivity implements View.OnClickList
 		return handled;
 	}
 
-	// asynchronous download of source code
+	// asynchronous download of source
 	private class LoginTask extends AsyncTask<String, Void, Integer> {
 		@Override
 		protected Integer doInBackground(String... urls) {
